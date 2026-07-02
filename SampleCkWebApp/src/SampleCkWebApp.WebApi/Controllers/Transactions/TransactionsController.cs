@@ -532,6 +532,18 @@ public class TransactionsController : ApiControllerBase
                     Date = extracted.Date ?? DateTime.UtcNow
                 });
             },
-            errors => Problem(detail: errors.First().Description));
+        errors =>
+        {
+            var error = errors.First();
+
+            Console.WriteLine($"[DOCUMENT_SCAN_ERROR] Code: {error.Code}");
+            Console.WriteLine($"[DOCUMENT_SCAN_ERROR] Description: {error.Description}");
+
+            return BadRequest(new
+            {
+                code = error.Code,
+                message = error.Description
+            });
+        });
     }
 }
