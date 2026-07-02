@@ -469,7 +469,7 @@ public class TransactionsController : ApiControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> ExtractTransactionFromDocument(
-        [FromForm, Required] IFormFile file,
+        [FromForm] IFormFile? file,
         [FromForm, Required] int userId,
         CancellationToken cancellationToken = default)
     {
