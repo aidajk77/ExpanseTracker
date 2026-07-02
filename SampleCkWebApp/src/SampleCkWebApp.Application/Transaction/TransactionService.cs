@@ -735,7 +735,7 @@ public class TransactionService : ITransactionService
 
         var requestBody = new
         {
-            model = "gpt-5.5",
+            model = "gpt-5.4-mini",
             input = new object[]
             {
                 new
