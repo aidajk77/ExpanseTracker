@@ -7,6 +7,7 @@ using Contracts.DTOs.Transaction;
 using Microsoft.AspNetCore.Authorization;
 using SampleCkWebApp.Contracts.DTOs.Common;
 using Domain.Enums;
+using SampleCkWebApp.Application.Category.Interfaces.Application;
 
 namespace SampleCkWebApp.WebApi.Controllers.Transactions;
 
@@ -19,10 +20,12 @@ namespace SampleCkWebApp.WebApi.Controllers.Transactions;
 public class TransactionsController : ApiControllerBase
 {
     private readonly ITransactionService _transactionService;
+    private readonly ICategoryService _categoryService;
     
-    public TransactionsController(ITransactionService transactionService)
+    public TransactionsController(ITransactionService transactionService, ICategoryService categoryService)
     {
         _transactionService = transactionService;
+        _categoryService = categoryService;
     }
 
     /*
@@ -445,5 +448,87 @@ public class TransactionsController : ApiControllerBase
         return result.Match(
             _ => NoContent(),  //  Returns 204 No Content on success
             Problem);
+    }
+
+    /// <summary>
+    /// Extracts transaction data from an uploaded document or receipt image
+    /// </summary>
+    /// <param name="file">Uploaded image file containing transaction document or receipt</param>
+    /// <param name="userId">The unique identifier of the user</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Extracted transaction draft data for user confirmation</returns>
+    /// <response code="200">Successfully extracted transaction data from document</response>
+    /// <response code="400">Invalid file, unsupported image type, or extraction failed</response>
+    /// <response code="401">User is not authorized</response>
+    /// <response code="500">Internal server error</response>
+    [Authorize]
+    [HttpPost("document")]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult> ExtractTransactionFromDocument(
+        [FromForm, Required] IFormFile file,
+        [FromForm, Required] int userId,
+        CancellationToken cancellationToken = default)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest("Image file is required.");
+
+        var supportedContentTypes = new[]
+        {
+            "image/jpeg",
+            "image/png",
+            "image/webp"
+        };
+
+        if (!supportedContentTypes.Contains(file.ContentType))
+            return BadRequest("Only JPEG, PNG, and WEBP images are supported.");
+
+        var categoriesResult = await _categoryService.GetAllUserCategoriesAsync(
+            userId,
+            cancellationToken);
+
+        if (categoriesResult.IsError)
+            return Problem(detail: categoriesResult.Errors.First().Description);
+
+        var categories = categoriesResult.Value.ToList();
+        var categoryNames = categories.Select(category => category.Name);
+
+        var extractionResult = await _transactionService.ExtractTransactionFromImageAsync(
+            file.OpenReadStream(),
+            file.ContentType,
+            categoryNames,
+            cancellationToken);
+
+        return extractionResult.Match<ActionResult>(
+            extracted =>
+            {
+                var matchedCategory = categories.FirstOrDefault(category =>
+                    !string.IsNullOrWhiteSpace(extracted.Category) &&
+                    category.Name.Equals(extracted.Category, StringComparison.OrdinalIgnoreCase));
+
+                var transactionType = extracted.Type?.ToLowerInvariant() switch
+                {
+                    "income" => TransactionType.INCOME,
+                    "expense" => TransactionType.EXPENSE,
+                    _ => (TransactionType?)null
+                };
+
+                return Ok(new
+                {
+                    UserId = userId,
+                    Type = transactionType,
+                    Amount = extracted.Amount,
+                    CategoryId = matchedCategory?.Id,
+                    CategoryName = matchedCategory?.Name ?? extracted.Category,
+                    PaymentMethodId = (int?)null,
+                    SavingId = (int?)null,
+                    Description = extracted.Description,
+                    Date = extracted.Date ?? DateTime.UtcNow
+                });
+            },
+            errors => Problem(detail: errors.First().Description));
     }
 }

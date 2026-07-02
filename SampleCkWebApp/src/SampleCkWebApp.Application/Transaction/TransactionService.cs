@@ -18,6 +18,10 @@ using SampleCkWebApp.Application.Savings.Interfaces.Infrastructure;
 using SampleCkWebApp.Application.Category.Interfaces.Infrastructure;
 using SampleCkWebApp.Application.Currencies.Interfaces.Application;
 using SampleCkWebApp.Application.Currencies.Interfaces.Infrastructure;
+using SampleCkWebApp.Contracts.DTOs.Transaction;
+using System.Net.Http.Headers;
+using System.Text.Json;
+using System.Text;
 
 namespace SampleCkWebApp.Application.Transaction;
 
@@ -669,6 +673,160 @@ public class TransactionService : ITransactionService
         }
 
         return Result.Success;
+    }
+
+    public async Task<ErrorOr<MlTransactionExtractionResult>> ExtractTransactionFromImageAsync(
+        Stream imageStream,
+        string contentType,
+        IEnumerable<string> availableCategories,
+        CancellationToken cancellationToken = default)
+    {
+        if (imageStream == null || !imageStream.CanRead)
+            return Error.Validation("Image.Invalid", "Image stream is invalid.");
+
+        if (contentType != "image/jpeg" && contentType != "image/png" && contentType != "image/webp")
+            return Error.Validation("Image.UnsupportedType", "Only JPEG, PNG, and WEBP images are supported.");
+
+        using var memoryStream = new MemoryStream();
+        await imageStream.CopyToAsync(memoryStream, cancellationToken);
+
+        if (memoryStream.Length == 0)
+            return Error.Validation("Image.Empty", "Image is empty.");
+
+        if (memoryStream.Length > 10 * 1024 * 1024)
+            return Error.Validation("Image.TooLarge", "Image must be smaller than 10MB.");
+
+        var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        if (string.IsNullOrWhiteSpace(apiKey))
+            return Error.Failure("OpenAI.MissingApiKey", "OPENAI_API_KEY environment variable is missing.");
+
+        var base64Image = Convert.ToBase64String(memoryStream.ToArray());
+        var dataUrl = $"data:{contentType};base64,{base64Image}";
+        var categories = string.Join(", ", availableCategories);
+
+        var prompt = $$"""
+        You are a financial transaction extractor.
+
+        Analyze the image. It may be a receipt, invoice, salary slip, bank screenshot, transfer confirmation, or handwritten transaction note.
+
+        Decide whether it is:
+        - expense
+        - income
+        - unknown
+
+        Extract the final transaction amount, not subtotal or tax.
+        Pick the closest category from this list:
+        {{categories}}
+
+        Return only valid JSON. No markdown. No explanation.
+
+        JSON schema:
+        {
+        "type": "expense | income | unknown",
+        "amount": number | null,
+        "currency": string | null,
+        "date": "YYYY-MM-DD" | null,
+        "merchantOrSource": string | null,
+        "category": string | null,
+        "confidence": number,
+        "notes": string | null
+        }
+        """;
+
+        var requestBody = new
+        {
+            model = "gpt-5.5",
+            input = new object[]
+            {
+                new
+                {
+                    role = "user",
+                    content = new object[]
+                    {
+                        new
+                        {
+                            type = "input_text",
+                            text = prompt
+                        },
+                        new
+                        {
+                            type = "input_image",
+                            image_url = dataUrl
+                        }
+                    }
+                }
+            }
+        };
+
+        using var httpClient = new HttpClient();
+        httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+        var json = JsonSerializer.Serialize(requestBody);
+        using var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        using var response = await httpClient.PostAsync(
+            "https://api.openai.com/v1/responses",
+            content,
+            cancellationToken);
+
+        var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+            return Error.Failure("OpenAI.RequestFailed", responseJson);
+
+        var outputText = ExtractOutputText(responseJson);
+        if (string.IsNullOrWhiteSpace(outputText))
+            return Error.Failure("OpenAI.EmptyResponse", "The model did not return extraction JSON.");
+
+        try
+        {
+            var result = JsonSerializer.Deserialize<MlTransactionExtractionResult>(
+                outputText,
+                new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+            if (result == null)
+                return Error.Failure("OpenAI.InvalidJson", "Could not parse extraction result.");
+
+            result.Type = result.Type.ToLowerInvariant();
+
+            if (result.Type != "expense" && result.Type != "income")
+                result.Type = "unknown";
+
+            return result;
+        }
+        catch (JsonException)
+        {
+            return Error.Failure("OpenAI.InvalidJson", outputText);
+        }
+    }
+
+    private static string? ExtractOutputText(string responseJson)
+    {
+        using var document = JsonDocument.Parse(responseJson);
+
+        if (!document.RootElement.TryGetProperty("output", out var output))
+            return null;
+
+        foreach (var outputItem in output.EnumerateArray())
+        {
+            if (!outputItem.TryGetProperty("content", out var content))
+                continue;
+
+            foreach (var contentItem in content.EnumerateArray())
+            {
+                if (contentItem.TryGetProperty("type", out var type) &&
+                    type.GetString() == "output_text" &&
+                    contentItem.TryGetProperty("text", out var text))
+                {
+                    return text.GetString();
+                }
+            }
+        }
+
+        return null;
     }
 
 }
