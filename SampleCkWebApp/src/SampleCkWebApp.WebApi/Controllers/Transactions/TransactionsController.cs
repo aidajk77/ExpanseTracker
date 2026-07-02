@@ -473,6 +473,9 @@ public class TransactionsController : ApiControllerBase
         [FromForm, Required] int userId,
         CancellationToken cancellationToken = default)
     {
+        Console.WriteLine($"File content type: {file.ContentType}");
+        Console.WriteLine($"File name: {file.FileName}");
+        Console.WriteLine($"File length: {file.Length}");
         if (file == null || file.Length == 0)
             return BadRequest("Image file is required.");
 
