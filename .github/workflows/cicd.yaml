@@ -121,7 +121,11 @@ jobs:
             --timeout=3600
             --service-account=expensetrackerbackend@expensetracker-496010.iam.gserviceaccount.com
             --add-cloudsql-instances=expensetracker-496010:europe-west1:expensetracker-db
-            --set-env-vars=ASPNETCORE_ENVIRONMENT=Production,ASPNETCORE_URLS=http://+:8080,Database__ConnectionString=${{ secrets.DB_CONNECTION_STRING }}
+          env_vars: |
+            ASPNETCORE_ENVIRONMENT=Production
+            ASPNETCORE_URLS=http://+:8080
+            Database__ConnectionString=${{ secrets.DB_CONNECTION_STRING }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
 
       - name: Display Deployment Result
         run: |
