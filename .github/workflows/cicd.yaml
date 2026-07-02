@@ -125,7 +125,7 @@ jobs:
             ASPNETCORE_ENVIRONMENT=Production
             ASPNETCORE_URLS=http://+:8080
             Database__ConnectionString=${{ secrets.DB_CONNECTION_STRING }}
-            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            OPENAI_API_KEY=${{ secrets.OPEN_AI_KEY }}
 
       - name: Display Deployment Result
         run: |
