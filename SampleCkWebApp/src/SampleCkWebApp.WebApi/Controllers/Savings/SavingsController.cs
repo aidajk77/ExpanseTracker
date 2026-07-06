@@ -6,6 +6,7 @@ using SampleCkWebApp.WebApi.Controllers;
 using Contracts.DTOs.Saving;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
+using Domain.Enums;
 
 namespace SampleCkWebApp.WebApi.Controllers.Savings;
 
@@ -23,6 +24,13 @@ public class SavingsController : ApiControllerBase
     {
         _savingService = savingService;
     }
+
+    private bool CanAccessUser(int userId)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        return User.IsInRole(Role.Admin.ToString()) ||
+               (int.TryParse(userIdClaim?.Value, out var currentUserId) && currentUserId == userId);
+    }
     
     /// <summary>
     /// Retrieves all savings from the system
@@ -31,7 +39,7 @@ public class SavingsController : ApiControllerBase
     /// <returns>List of all savings</returns>
     /// <response code="200">Successfully retrieved savings</response>
     /// <response code="500">Internal server error</response>
-    [Authorize]
+    [Authorize(Policy = "AdminOnly")]
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<SavingDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -62,6 +70,9 @@ public class SavingsController : ApiControllerBase
         [FromRoute, Required] int userId,
         CancellationToken cancellationToken)
     {
+        if (!CanAccessUser(userId))
+            return Forbid();
+
         var result = await _savingService.GetUserSavingsAsync(userId, cancellationToken);
         
         return result.Match(
@@ -116,6 +127,9 @@ public class SavingsController : ApiControllerBase
         [FromRoute, Required] int userId,
         CancellationToken cancellationToken)
     {
+        if (!CanAccessUser(userId))
+            return Forbid();
+
         var result = await _savingService.GetUserNonCompletedSavingsAsync(userId, cancellationToken);
         
         return result.Match(

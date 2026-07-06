@@ -5,6 +5,8 @@ using SampleCkWebApp.WebApi.Controllers;
 using SampleCkWebApp.Application.UserSaving.Interfaces.Application;
 using Contracts.DTOs.UserSaving;
 using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
+using Domain.Enums;
 
 namespace SampleCkWebApp.WebApi.Controllers.UserSavings;
 
@@ -22,6 +24,13 @@ public class UserSavingsController : ApiControllerBase
     {
         _userSavingService = userSavingService;
     }
+
+    private bool CanAccessUser(int userId)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        return User.IsInRole(Role.Admin.ToString()) ||
+               (int.TryParse(userIdClaim?.Value, out var currentUserId) && currentUserId == userId);
+    }
     
     /// <summary>
     /// Retrieves all savings associated with a specific user
@@ -32,7 +41,7 @@ public class UserSavingsController : ApiControllerBase
     /// <response code="200">Successfully retrieved user savings</response>
     /// <response code="404">User not found</response>
     /// <response code="500">Internal server error</response>
-    [Authorize]
+    [Authorize(Policy = "AdminOnly")]
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<UserSavingDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -68,6 +77,9 @@ public class UserSavingsController : ApiControllerBase
         [FromRoute, Required] int savingId, 
         CancellationToken cancellationToken)
     {
+        if (!CanAccessUser(userId))
+            return Forbid();
+
         var result = await _userSavingService.GetUserSavingByIdAsync(userId, savingId, cancellationToken);
         
         return result.Match(
@@ -99,6 +111,11 @@ public class UserSavingsController : ApiControllerBase
         [FromBody, Required] CreateUserSavingDto request, 
         CancellationToken cancellationToken)
     {
+        if (!CanAccessUser(userId))
+            return Forbid();
+
+        request.UserId = userId;
+
         var result = await _userSavingService.CreateUserSavingAsync(request, cancellationToken);
         
         return result.Match(
@@ -130,6 +147,9 @@ public class UserSavingsController : ApiControllerBase
         [FromBody, Required] UpdateUserSavingDto request,
         CancellationToken cancellationToken)
     {
+        if (!CanAccessUser(userId))
+            return Forbid();
+
         var result = await _userSavingService.UpdateUserSavingAsync(userId, savingId, request, cancellationToken);
         
         return result.Match(
@@ -157,6 +177,9 @@ public class UserSavingsController : ApiControllerBase
         [FromRoute, Required] int savingId,
         CancellationToken cancellationToken)
     {
+        if (!CanAccessUser(userId))
+            return Forbid();
+
         var result = await _userSavingService.DeleteUserSavingAsync(userId, savingId, cancellationToken);
         
         return result.Match(

@@ -67,6 +67,9 @@ public class UserService : IUserService
 
             user.CurrencyId = request.CurrencyId.Value;
         }
+        
+        if (request.Role.HasValue)
+            user.Role = request.Role.Value;
 
         await _userRepository.UpdateAsync(user);
         await _userRepository.SaveChangesAsync();

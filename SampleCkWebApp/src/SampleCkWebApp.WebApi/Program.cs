@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Domain.Enums;
 using SampleCkWebApp.Application;
 using SampleCkWebApp.Infrastructure.Data;
 using SampleCkWebApp.WebApi;
@@ -52,7 +53,11 @@ var builder = WebApplication.CreateBuilder(args);
             };
         });
     
-    builder.Services.AddAuthorization();
+    builder.Services.AddAuthorization(options =>
+    {
+        options.AddPolicy("AdminOnly", policy =>
+            policy.RequireRole(Role.Admin.ToString()));
+    });
 
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(c =>

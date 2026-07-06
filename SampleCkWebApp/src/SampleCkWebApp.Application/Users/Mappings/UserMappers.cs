@@ -16,6 +16,7 @@ namespace api.Mappers
                 Id = user.Id,
                 Username = user.Username,
                 Email = user.Email,
+                Role = user.Role.ToString(),
                 CreatedAt = user.CreatedAt,
                 CurrencyId = user.CurrencyId
             };
@@ -28,6 +29,7 @@ namespace api.Mappers
                 Username = dto.Username,
                 Email = dto.Email,
                 PasswordHash = passwordHash,
+                Role = Domain.Enums.Role.User,
                 CurrencyId = dto.CurrencyId
             };
         }

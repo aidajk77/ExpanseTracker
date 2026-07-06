@@ -8,10 +8,10 @@ namespace SampleCkWebApp.Application.Transaction.Interfaces.Application;
 
 public interface ITransactionService
 {
-    /*Task<ErrorOr<PaginatedResponse<TransactionDto>>> GetPaginatedTransactionsAsync(
+    Task<ErrorOr<PaginatedResponse<TransactionDto>>> GetPaginatedTransactionsAsync(
         int page = 1,
         int limit = 10,
-        CancellationToken cancellationToken = default);*/
+        CancellationToken cancellationToken = default);
     Task<ErrorOr<PaginatedResponse<TransactionDto>>> GetUserTransactionsPaginatedAsync(
         int userId,
         int page = 1,

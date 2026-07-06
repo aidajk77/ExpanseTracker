@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authorization;
 using SampleCkWebApp.Contracts.DTOs.Common;
 using Domain.Enums;
 using SampleCkWebApp.Application.Category.Interfaces.Application;
+using System.Security.Claims;
 
 namespace SampleCkWebApp.WebApi.Controllers.Transactions;
 
@@ -28,8 +29,19 @@ public class TransactionsController : ApiControllerBase
         _categoryService = categoryService;
     }
 
-    /*
-    [Authorize]
+    private bool TryGetCurrentUserId(out int currentUserId)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        return int.TryParse(userIdClaim?.Value, out currentUserId);
+    }
+
+    private bool CanAccessUser(int userId)
+    {
+        return User.IsInRole(Role.Admin.ToString()) ||
+               (TryGetCurrentUserId(out var currentUserId) && currentUserId == userId);
+    }
+
+    [Authorize(Policy = "AdminOnly")]
     [HttpGet]
     [ProducesResponseType(typeof(PaginatedResponse<TransactionDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -43,8 +55,6 @@ public class TransactionsController : ApiControllerBase
             transactions => Ok(transactions),
             errors => Problem(detail: errors.First().Description));
     }
-
-    */
 
     /// <summary>
     /// Retrieves paginated transactions for a specific user with optional filters
@@ -80,6 +90,9 @@ public class TransactionsController : ApiControllerBase
         [FromQuery] DateTime? endDate = null,
         CancellationToken cancellationToken = default)
     {
+        if (!CanAccessUser(userId))
+            return Forbid();
+
         var result = await _transactionService.GetUserTransactionsPaginatedAsync(
             userId, 
             page, 
@@ -115,6 +128,9 @@ public class TransactionsController : ApiControllerBase
         [FromRoute, Required] int userId,
         CancellationToken cancellationToken = default)
     {
+        if (!CanAccessUser(userId))
+            return Forbid();
+
         var result = await _transactionService.GetAllUserTransactionsAsync(userId, cancellationToken);
         
         return result.Match(
@@ -171,6 +187,9 @@ public class TransactionsController : ApiControllerBase
         [FromQuery, Required] int year,
         CancellationToken cancellationToken = default)
     {
+        if (!CanAccessUser(userId))
+            return Forbid();
+
         //  Validate month
         if (month < 1 || month > 12)
             return BadRequest(new { error = "Month must be between 1 and 12" });
@@ -210,6 +229,9 @@ public class TransactionsController : ApiControllerBase
         [FromQuery, Required] DateTime endDate,
         CancellationToken cancellationToken = default)
     {
+        if (!CanAccessUser(userId))
+            return Forbid();
+
         if (startDate > endDate)
             return BadRequest(new { error = "Start date must be before end date" });
 
@@ -244,6 +266,9 @@ public class TransactionsController : ApiControllerBase
         [FromQuery, Required] int year,
         CancellationToken cancellationToken = default)
     {
+        if (!CanAccessUser(userId))
+            return Forbid();
+
         //  Validate month
         if (month < 1 || month > 12)
             return BadRequest(new { error = "Month must be between 1 and 12" });
@@ -283,6 +308,9 @@ public class TransactionsController : ApiControllerBase
         [FromQuery, Required] DateTime endDate,
         CancellationToken cancellationToken = default)
     {
+        if (!CanAccessUser(userId))
+            return Forbid();
+
         if (startDate > endDate)
             return BadRequest(new { error = "Start date must be before end date" });
 
@@ -317,6 +345,9 @@ public class TransactionsController : ApiControllerBase
         [FromQuery, Required] int year,
         CancellationToken cancellationToken = default)
     {
+        if (!CanAccessUser(userId))
+            return Forbid();
+
         //  Validate month
         if (month < 1 || month > 12)
             return BadRequest(new { error = "Month must be between 1 and 12" });
@@ -356,6 +387,9 @@ public class TransactionsController : ApiControllerBase
         [FromQuery, Required] DateTime endDate,
         CancellationToken cancellationToken = default)
     {
+        if (!CanAccessUser(userId))
+            return Forbid();
+
         if (startDate > endDate)
             return BadRequest(new { error = "Start date must be before end date" });
 
@@ -473,9 +507,9 @@ public class TransactionsController : ApiControllerBase
         [FromForm, Required] int userId,
         CancellationToken cancellationToken = default)
     {
-        Console.WriteLine($"File content type: {file.ContentType}");
-        Console.WriteLine($"File name: {file.FileName}");
-        Console.WriteLine($"File length: {file.Length}");
+        if (!CanAccessUser(userId))
+            return Forbid();
+
         if (file == null || file.Length == 0)
             return BadRequest("Image file is required.");
 

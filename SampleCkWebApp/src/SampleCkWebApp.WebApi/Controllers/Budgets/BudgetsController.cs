@@ -7,6 +7,7 @@ using Contracts.DTOs.Budget;
 using Microsoft.AspNetCore.Authorization;
 using SampleCkWebApp.Contracts.DTOs.Budget;
 using System.Security.Claims;
+using Domain.Enums;
 
 namespace SampleCkWebApp.WebApi.Controllers.Budgets;
 
@@ -24,6 +25,13 @@ public class BudgetsController : ApiControllerBase
     {
         _budgetService = budgetService;
     }
+
+    private bool CanAccessUser(int userId)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        return User.IsInRole(Role.Admin.ToString()) ||
+               (int.TryParse(userIdClaim?.Value, out var currentUserId) && currentUserId == userId);
+    }
     
     /// <summary>
     /// Retrieves all budgets from the system
@@ -32,7 +40,7 @@ public class BudgetsController : ApiControllerBase
     /// <returns>List of all budgets</returns>
     /// <response code="200">Successfully retrieved budgets</response>
     /// <response code="500">Internal server error</response>
-    [Authorize]
+    [Authorize(Policy = "AdminOnly")]
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<BudgetDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -91,6 +99,9 @@ public class BudgetsController : ApiControllerBase
         [FromRoute, Required] int userId,
         CancellationToken cancellationToken)
     {
+        if (!CanAccessUser(userId))
+            return Forbid();
+
         var result = await _budgetService.GetUserBudgetsAsync(userId, cancellationToken);
         
         return result.Match(
@@ -120,6 +131,9 @@ public class BudgetsController : ApiControllerBase
         [FromRoute, Required] int year,
         CancellationToken cancellationToken)
     {
+        if (!CanAccessUser(userId))
+            return Forbid();
+
         var result = await _budgetService.GetUserBudgetsForMonthAsync(userId, month, year, cancellationToken);
         
         return result.Match(
@@ -145,6 +159,9 @@ public class BudgetsController : ApiControllerBase
         [FromRoute, Required] int userId,
         CancellationToken cancellationToken)
     {
+        if (!CanAccessUser(userId))
+            return Forbid();
+
         var result = await _budgetService.GetUserBudgetSummaryAsync(userId, cancellationToken);
         
         return result.Match(
@@ -174,6 +191,9 @@ public class BudgetsController : ApiControllerBase
         [FromRoute, Required] int year,
         CancellationToken cancellationToken)
     {
+        if (!CanAccessUser(userId))
+            return Forbid();
+
         var result = await _budgetService.GetUserBudgetSummaryForMonthAsync(userId, month, year, cancellationToken);
         
         return result.Match(

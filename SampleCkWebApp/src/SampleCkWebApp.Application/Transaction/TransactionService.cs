@@ -66,7 +66,7 @@ public class TransactionService : ITransactionService
         _transactionValidator = transactionValidator;
     }
 
-    /*public async Task<ErrorOr<PaginatedResponse<TransactionDto>>> GetPaginatedTransactionsAsync(
+    public async Task<ErrorOr<PaginatedResponse<TransactionDto>>> GetPaginatedTransactionsAsync(
         int page = 1,
         int limit = 10,
         CancellationToken cancellationToken = default)
@@ -103,7 +103,6 @@ public class TransactionService : ITransactionService
         return response;
     }
 
-*/
     private async Task<decimal> ConvertFromUSDToUserCurrencyAsync(
         decimal amountInUSD,
         int userCurrencyId)

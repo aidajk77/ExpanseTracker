@@ -6,6 +6,7 @@ using SampleCkWebApp.WebApi.Controllers;
 using SampleCkWebApp.Contracts.DTOs.User;
 using Contracts.DTOs.User;
 using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace SampleCkWebApp.WebApi.Controllers.Users;
 
@@ -25,6 +26,22 @@ public class UsersController : ApiControllerBase
         _userService = userService;
         _authService = authService;
     }
+
+    private bool TryGetCurrentUserId(out int userId)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        return int.TryParse(userIdClaim?.Value, out userId);
+    }
+
+    private bool IsAdmin()
+    {
+        return User.IsInRole(Domain.Enums.Role.Admin.ToString());
+    }
+
+    private bool CanAccessUser(int userId)
+    {
+        return IsAdmin() || (TryGetCurrentUserId(out var currentUserId) && currentUserId == userId);
+    }
     
     /// <summary>
     /// Retrieves all users from the system
@@ -33,7 +50,7 @@ public class UsersController : ApiControllerBase
     /// <returns>List of all users</returns>
     /// <response code="200">Successfully retrieved users</response>
     /// <response code="500">Internal server error</response>,
-    [Authorize]
+    [Authorize(Policy = "AdminOnly")]
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<UserDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -66,9 +83,7 @@ public class UsersController : ApiControllerBase
     public async Task<IActionResult> GetCurrentUser(CancellationToken cancellationToken)
     {
         // Get the user ID from the JWT token claims
-        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
-        
-        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+        if (!TryGetCurrentUserId(out var userId))
             return Unauthorized(new { message = "Invalid or missing user ID in token" });
 
         var result = await _userService.GetUserByIdAsync(userId, cancellationToken);
@@ -96,6 +111,9 @@ public class UsersController : ApiControllerBase
         [FromRoute, Required] int id, 
         CancellationToken cancellationToken)
     {
+        if (!CanAccessUser(id))
+            return Forbid();
+
         var result = await _userService.GetUserByIdAsync(id, cancellationToken);
         
         return result.Match(
@@ -178,9 +196,7 @@ public class UsersController : ApiControllerBase
         CancellationToken cancellationToken)
     {
         // Get the user ID from the JWT token claims
-        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
-        
-        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+        if (!TryGetCurrentUserId(out var userId))
             return Unauthorized(new { message = "Invalid or missing user ID in token" });
 
         var result = await _authService.ChangePasswordAsync(userId, request, cancellationToken);
@@ -214,6 +230,12 @@ public class UsersController : ApiControllerBase
         [FromBody, Required] UpdateUserDto request,
         CancellationToken cancellationToken)
     {
+        if (!CanAccessUser(id))
+            return Forbid();
+
+        if (!IsAdmin())
+            request.Role = null;
+
         var result = await _userService.UpdateUserAsync(id, request, cancellationToken);
         
         return result.Match(
@@ -230,7 +252,7 @@ public class UsersController : ApiControllerBase
     /// <response code="204">User successfully deleted</response>
     /// <response code="404">User not found</response>
     /// <response code="500">Internal server error</response>
-    [Authorize]
+    [Authorize(Policy = "AdminOnly")]
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

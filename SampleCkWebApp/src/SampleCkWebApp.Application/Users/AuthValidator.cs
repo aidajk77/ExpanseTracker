@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Contracts.DTOs.User;
 using ErrorOr;
 using Domain.Errors;
-using Domain.Enums;
 
 namespace SampleCkWebApp.Application.Users
 {
@@ -33,10 +32,6 @@ namespace SampleCkWebApp.Application.Users
             else if (request.Password.Length < 8)
                 errors.Add(UserErrors.InvalidPassword);
             
-            //  Validate Role
-            if (!Enum.IsDefined(typeof(Role), request.Role))
-                errors.Add(UserErrors.InvalidRole);
-
             //  Validate CurrencyId
             if (request.CurrencyId <= 0)
                 errors.Add(UserErrors.InvalidCurrency);
