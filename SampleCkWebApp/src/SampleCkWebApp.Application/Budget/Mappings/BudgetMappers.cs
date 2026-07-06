@@ -15,6 +15,7 @@ namespace api.Mappers
             {
                 Id = budget.Id,
                 CategoryId = budget.CategoryId,
+                UserId = budget.Category?.UserId ?? 0,
                 AmountLimit = budget.AmountLimit,
                 CurrentAmount = budget.CurrentAmount,
                 Month = budget.Month,

@@ -9,6 +9,7 @@ namespace Contracts.DTOs.Budget
     {
         public int Id { get; set; }
         public int CategoryId { get; set; }
+        public int UserId { get; set; }
         public decimal AmountLimit { get; set; }
         public decimal CurrentAmount { get; set; }
         public int Month { get; set; }

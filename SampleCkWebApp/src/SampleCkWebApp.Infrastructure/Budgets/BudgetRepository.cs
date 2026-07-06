@@ -117,7 +117,10 @@ public class BudgetRepository : IBudgetRepository
 
     public async Task<IEnumerable<Budget>> GetAllAsync()
     {
-        return await _budgetSet.ToListAsync();
+        return await _budgetSet
+            .AsNoTracking()
+            .Include(b => b.Category)
+            .ToListAsync();
     }
 
     public async Task AddAsync(Budget entity)
