@@ -39,7 +39,7 @@ public class SavingsController : ApiControllerBase
     /// <returns>List of all savings</returns>
     /// <response code="200">Successfully retrieved savings</response>
     /// <response code="500">Internal server error</response>
-    [Authorize(Policy = "AdminOnly")]
+    [Authorize]
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<SavingDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
